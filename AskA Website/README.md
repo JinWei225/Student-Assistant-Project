@@ -135,13 +135,19 @@ These rows are placeholders. Replace them with real worker emails, because ticke
     ```
 
 2.  **Environment Variables (`.env`)**:
-    Create a file named `.env` in the root directory and ensure it maps to your MySQL credentials:
+    Create a file named `.env` in the root directory, set your MySQL credentials and add a `JWT_SECRET`:
     ```env
     MYSQL_HOST=localhost
     MYSQL_PORT=3306
     MYSQL_USER=root
     MYSQL_PASSWORD=
     MYSQL_DATABASE=company_reports
+    JWT_SECRET=
+    ```
+
+    Set `JWT_SECRET` to a long random value. The server won't start without it. To generate one:
+    ```bash
+    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
     ```
 
 ---

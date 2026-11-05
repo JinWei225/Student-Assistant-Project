@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -24,7 +25,12 @@ const upload = multer({ storage });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = 'aska-super-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    console.error('❌ JWT_SECRET is not set. Add it to your .env file before starting the server.');
+    process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());

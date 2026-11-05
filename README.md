@@ -135,6 +135,13 @@ The **[full setup guide](AskA%20Website/README.md)** has the SQL scripts, creden
    MYSQL_USER=root
    MYSQL_PASSWORD=
    MYSQL_DATABASE=company_reports
+   JWT_SECRET=
+   ```
+
+   Set `JWT_SECRET` to a long random value. The server won't start without it. To generate one:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 
 8. **Start the server.**
@@ -165,7 +172,6 @@ This is a local development project and isn't ready for production as it stands.
 
 **Security**
 
-- `JWT_SECRET` is hardcoded in `server.js`, and that value is public in this repository.
 - `server.js` serves its whole directory as static files, so the backend source can be downloaded from the running site.
 - Uploaded attachments can be read through `/uploads` without logging in.
 - The n8n chat webhook is called directly from the browser, with no authentication.
