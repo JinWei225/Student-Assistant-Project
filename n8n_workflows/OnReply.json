@@ -274,7 +274,7 @@
     },
     {
       "parameters": {
-        "jsCode": "for (let item of items) {\n  // 1. Grab the raw 'From' string (e.g., \"Jane Doe <worker2@example.com>\")\n  const rawFrom = item.json.From;\n\n  // 2. Define the logical pattern of an email address (text @ text . text)\n  const emailPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+)/;\n  \n  // 3. Search the raw string for that exact pattern\n  const match = rawFrom.match(emailPattern);\n\n  // 4. If we find a match, create the new attribute and assign the clean email.\n  // If no email is found (malformed data), we assign null to prevent pipeline crashes.\n  item.json.ExtractedEmail = match ? match[1] : null;\n}\n\nreturn items;"
+        "jsCode": "for (let item of items) {\n  // 1. Grab the raw 'From' string (e.g., \"Jane Doe <worker@example.com>\")\n  const rawFrom = item.json.From;\n\n  // 2. Define the logical pattern of an email address (text @ text . text)\n  const emailPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+)/;\n  \n  // 3. Search the raw string for that exact pattern\n  const match = rawFrom.match(emailPattern);\n\n  // 4. If we find a match, create the new attribute and assign the clean email.\n  // If no email is found (malformed data), we assign null to prevent pipeline crashes.\n  item.json.ExtractedEmail = match ? match[1] : null;\n}\n\nreturn items;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

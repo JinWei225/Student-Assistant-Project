@@ -1,5 +1,8 @@
 # AskA Website — Setup Guide
 
+> [!NOTE]
+> This project is shared for reference only. See the [main README](../README.md) for details.
+
 This project is a support chat and ticket submission website for students. It integrates an AI-powered chat system with a backend ticketing system, using Node.js for the server and n8n for automated workflows.
 
 ---
@@ -119,7 +122,7 @@ INSERT INTO workers (full_name, email, department, is_active) VALUES
 ('Worker Three', 'worker3@example.com', 'IT', TRUE),
 ('Worker Four', 'worker4@example.com', 'IT', TRUE);
 ```
-You may change the workers by adding more rows or editing rows in the `workers` table.
+These rows are placeholders. Replace them with real worker emails, because tickets are sent to these addresses. A worker's `department` must exactly match the department name used in the ticket form.
 
 ---
 
@@ -279,13 +282,14 @@ After that, go back to the **Student Info Assistant** workflow and select the "d
 
 ## Get Started
 
-1. Upload the "your-document.pdf" file onto your Google Drive.
+1. Upload your own knowledge base document (PDF) to your Google Drive. No document is included in this repository.
 2. Get the id of the file from the URL (e.g., https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p/view?usp=sharing, the id is "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p").
 3. In the **Student Info Assistant** workflow, go to the `Download File` node.
-4. Update the "File" field with the id you just copied.
+4. Replace `YOUR_GOOGLE_DRIVE_FILE_ID` in the "File" field with the id you just copied.
 5. Insert the information into Supabase Vector Database by clicking the "Execute Workflow" button beside `When clicking 'Execute Workflow'` trigger node at the left part of the **Student Info Assistant** workflow. Note that you only need to execute this once.
-6. Publish the **Student Info Assistant**, **OnSubmit** and **OnReply** workflows by clicking the "Publish" button at the top right corner of the n8n interface in each workflow.
-7. You can go to the website and try to chat with the AI assistant and submit a ticket to the different department.
+6. In the **OnReply** workflow, open the `Create an event1` node and select your own calendar in the "Calendar" field. It ships with the placeholder `your-calendar@example.com`.
+7. Publish the **Student Info Assistant**, **OnSubmit** and **OnReply** workflows by clicking the "Publish" button at the top right corner of the n8n interface in each workflow.
+8. You can go to the website and try to chat with the AI assistant and submit a ticket to the different department.
 
 ## Using the Website
 Before executing step 3 and 4, make sure you have Setup n8n Workflow and published it (see [Setup n8n Workflow](#setup-n8n-workflow)). 

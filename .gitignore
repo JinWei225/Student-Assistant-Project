@@ -1,1 +1,25 @@
-your-document.pdf
+# Dependencies
+node_modules/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# User uploads (created by the server at runtime)
+uploads/
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Knowledge base documents (never commit these)
+*.pdf
+*.docx

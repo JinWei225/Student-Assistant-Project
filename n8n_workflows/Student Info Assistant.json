@@ -190,7 +190,7 @@
         "operation": "download",
         "fileId": {
           "__rl": true,
-          "value": "=YOUR_GOOGLE_DRIVE_FILE_ID",
+          "value": "YOUR_GOOGLE_DRIVE_FILE_ID",
           "mode": "id"
         },
         "options": {}
