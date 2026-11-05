@@ -1,0 +1,525 @@
+{
+  "name": "OnSubmit",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "if ($input.context.itemIndex > 0) return []; \n\nconst allTickets = $items(\"AddEstimatedMinutes\");\nconst workers = $items(\"GetAvailableWorkers\");\nlet results = [];\n\nfor (const ticket of allTickets) {\n  for (const worker of workers) {\n    // Check if the ticket department matches the worker's department\n    if (ticket.json.department === worker.json.department) {\n      results.push({\n        json: {\n          ticket_id: ticket.json.id,\n          department: ticket.json.department,\n          block_room_no: ticket.json.block_room_no,\n          student_name: ticket.json.student_name,\n          student_telephone: ticket.json.student_telephone,\n          issue_category: ticket.json.issue_category,\n          worker_email: worker.json.email,\n          description: (ticket.json.description || \"\").trim(),\n          estimated_minutes: ticket.json.estimated_minutes\n        }\n      });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        240
+      ],
+      "id": "3f5e478b-c955-4482-93db-e79b534dded9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT email , department\nFROM workers \nWHERE is_active = TRUE;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        256
+      ],
+      "id": "4f0d9aec-cc8e-42a9-be3a-7b116828eb95",
+      "name": "GetAvailableWorkers",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2048,
+        240
+      ],
+      "id": "4755167d-3a02-4995-9479-20d7403e2425",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.worker_email }}",
+        "subject": "=[TICKET #{{ $json.ticket_id }}] {{ $json.issue_category}}",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <style>\n        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; line-height: 1.6; }\n        .container { background-color: #ffffff; max-width: 600px; margin: auto; padding: 30px; border-radius: 12px; border: 1px solid #e1e4e8; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }\n        .header { border-bottom: 3px solid #007bff; padding-bottom: 15px; margin-bottom: 25px; }\n        .priority-tag { background-color: #ebf5ff; color: #007bff; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }\n        .id-badge { float: right; color: #6a737d; font-size: 11px; font-family: monospace; }\n        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; }\n        .info-label { font-size: 11px; color: #6c757d; text-transform: uppercase; font-weight: bold; margin-bottom: 3px; }\n        .info-value { font-size: 14px; color: #212529; font-weight: 500; }\n        .message-box { background-color: #fff9db; border-left: 6px solid #fcc419; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }\n        .duration-highlight { color: #d9480f; font-weight: bold; font-size: 18px; }\n        .instruction-box { background-color: #f1f3f5; padding: 20px; border-radius: 8px; border: 1px dashed #ced4da; }\n        .footer { font-size: 12px; color: #868e96; margin-top: 40px; text-align: center; border-top: 1px solid #e9ecef; padding-top: 20px; }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <span class=\"id-badge\">REF: #{{ $json.ticket_id }}</span>\n            <span class=\"priority-tag\">Awaiting Assignment</span>\n            <h2 style=\"margin: 10px 0 0 0; color: #212529;\">New {{ $json.department }} Request</h2>\n        </div>\n        \n        <p>A new <strong>{{ $json.issue_category }}</strong> issue requires attention:</p>\n        \n        <div class=\"info-grid\">\n            <div>\n                <div class=\"info-label\">Location</div>\n                <div class=\"info-value\">{{ $json.block_room_no }}</div>\n            </div>\n            <div>\n                <div class=\"info-label\">Reported By</div>\n                <div class=\"info-value\">{{ $json.student_name }}</div>\n            </div>\n            <div>\n                <div class=\"info-label\">Contact Number</div>\n                <div class=\"info-value\">{{ $json.student_telephone }}</div>\n            </div>\n        </div>\n\n        <div class=\"message-box\">\n            <div style=\"font-size: 12px; color: #856404; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;\">Issue Description</div>\n            <div style=\"font-size: 16px; color: #212529;\">{{ $json.description }}</div>\n        </div>\n\n        <div style=\"margin-bottom: 25px;\">\n            <p style=\"margin: 0; color: #495057;\">AI Estimated Repair Time:</p>\n            <span class=\"duration-highlight\">{{ $json.estimated_minutes }} Minutes</span>\n        </div>\n\n        <div class=\"instruction-box\">\n            <h4 style=\"margin-top: 0; color: #343a40;\">How to Claim this Job:</h4>\n            <p style=\"margin-bottom: 5px;\">If you are available, please <strong>reply to this email</strong> directly.</p>\n            \n            <p style=\"font-size: 14px; color: #495057; margin-bottom: 5px; margin-top: 15px;\"><strong>Important Reply Instructions:</strong></p>\n            <ol style=\"font-size: 14px; color: #495057; margin-top: 0; padding-left: 20px;\">\n                <li>Your reply must be in <strong>English</strong>.</li>\n                <li>State your intended working time using <strong>military time</strong> (e.g., 14:00 instead of 2:00 PM).</li>\n            </ol>\n\n            <code style=\"display: block; background: #fff; padding: 10px; border-radius: 4px; margin-top: 15px; border: 1px solid #dee2e6;\">\n                Example: \"I'll take it. I'll be there at 14:00\"\n            </code>\n        </div>\n        \n        <div class=\"footer\">\n            University Maintenance Dispatcher • Reply to claim ticket #{{ $json.ticket_id }}\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2464,
+        240
+      ],
+      "id": "c4314b22-2356-4f53-a860-76364116fed9",
+      "name": "Send to Worker",
+      "webhookId": "b55cd580-d325-4113-9ca9-26957665cbb8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tickets \nSET last_broadcasted_at = NOW() \nWHERE id = {{ $json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        2928,
+        -176
+      ],
+      "id": "098d9e57-ba07-4d17-8cd5-a4dd80301492",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        -192
+      ],
+      "id": "0d5232e8-1430-4022-8681-16d5cd52cea8",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM tickets\nWHERE status = 'PENDING' \nAND (last_broadcasted_at IS NULL);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        16
+      ],
+      "id": "8937f72f-bac3-42b6-9f66-28a44e43a8b7",
+      "name": "GetUnbroadcastedTickets",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM tickets\nWHERE status = 'PENDING' \nAND (\n    last_broadcasted_at IS NULL \n    OR last_broadcasted_at < NOW() - INTERVAL 1 DAY\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        -192
+      ],
+      "id": "25caaaae-d828-4a2b-b2dc-dd403541db5a",
+      "name": "GetPendingTickets",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let newTickets = [];\nlet pendingTickets = [];\n\ntry { newTickets = $items(\"GetUnbroadcastedTickets\"); } catch (e) { newTickets = []; }\ntry { pendingTickets = $items(\"GetPendingTickets\"); } catch (e) { pendingTickets = []; }\n\nconst tickets = [...newTickets, ...pendingTickets];\n\nconst ticketString = tickets.map(t => {\n  return `ID: ${t.json.id} | Category: ${t.json.issue_category} | Description: ${t.json.description}`;\n}).join('\\n'); \n\nreturn {\n  all_tickets_string: ticketString\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        16
+      ],
+      "id": "3282fbe8-02c2-4ab3-a855-06a1b5a97e23",
+      "name": "MergeAllTickets"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "qwen3:8b",
+          "mode": "list",
+          "cachedResultName": "qwen3:8b"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an expert university maintenance dispatcher. Below is a list of maintenance reports. For each report, analyze the 'description' and estimate the duration of the repair in minutes. Provide the output as a JSON array of objects, each containing the 'id' and a new field 'estimated_minutes'. Be realistic: assume a single worker is performing the task.\nNEVER WRITE THE WORD 'json'\nReports: {{ $json.all_tickets_string }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        16
+      ],
+      "id": "0f5e4e2a-b10a-468e-a46f-99bbd215a50b",
+      "name": "EstimateDuration",
+      "credentials": {
+        "ollamaApi": {
+          "id": "f8F4oOkrWlj1YyF6",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawContent = $json.content;\nlet jsonString = rawContent;\n\n// Check if the model used the standard markdown code block\nif (rawContent.includes(\"```json\")) {\n    jsonString = rawContent.split(\"```json\")[1].split(\"```\")[0];\n} \n// Fallback just in case the model forgets the backticks but outputs \"json\"\nelse if (rawContent.includes(\"json\")) {\n    jsonString = rawContent.split(\"json\")[1];\n    \n    if (jsonString.lastIndexOf(\"]\") !== -1) {\n        jsonString = jsonString.substring(0, jsonString.lastIndexOf(\"]\") + 1);\n    }\n}\n\n// Trim any leftover whitespace or newlines\njsonString = jsonString.trim();\n\n// Parse the clean string into a JavaScript object or array\nconst parsedData = JSON.parse(jsonString);\n\n// --- THE FIX: The Dimensionality Check ---\n// We use Array.isArray() to verify if the parsed data is a list.\n// If it is NOT a list, we manually wrap it in brackets to force it into a list format.\nconst estimates = Array.isArray(parsedData) ? parsedData : [parsedData];\n\n// Now, .map() is guaranteed to work because 'estimates' is ALWAYS an array.\nreturn estimates.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        16
+      ],
+      "id": "5cf50ec7-e611-402b-b3a5-d3664b340c67",
+      "name": "GetContent"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1776,
+        16
+      ],
+      "id": "9631ad08-791e-4c21-afe0-63bf46ac316f",
+      "name": "AddEstimatedMinutes"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "a2adbab1-d7f0-47d6-b88c-8785eea6be7f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        560,
+        112
+      ],
+      "id": "7f9b77ad-50bd-46f1-8a86-2906cf86229e",
+      "name": "Webhook",
+      "webhookId": "a2adbab1-d7f0-47d6-b88c-8785eea6be7f"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tickets \nSET duration = {{ $json.estimated_minutes }}\nWHERE id = {{ $json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        2272,
+        16
+      ],
+      "id": "610c21d4-e555-4e8b-b614-0947ca29a604",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2000,
+        16
+      ],
+      "id": "4cbea70e-007f-45e4-a4cc-8d60966d55bd",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2672,
+        -176
+      ],
+      "id": "66eddf7d-85e5-4a15-a235-8887cacf3c88",
+      "name": "Merge1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "GetAvailableWorkers": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send to Worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Worker": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "GetUnbroadcastedTickets": {
+      "main": [
+        [
+          {
+            "node": "MergeAllTickets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AddEstimatedMinutes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "GetPendingTickets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GetAvailableWorkers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetPendingTickets": {
+      "main": [
+        [
+          {
+            "node": "MergeAllTickets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AddEstimatedMinutes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MergeAllTickets": {
+      "main": [
+        [
+          {
+            "node": "EstimateDuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EstimateDuration": {
+      "main": [
+        [
+          {
+            "node": "GetContent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetContent": {
+      "main": [
+        [
+          {
+            "node": "AddEstimatedMinutes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AddEstimatedMinutes": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "GetUnbroadcastedTickets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GetAvailableWorkers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "5a84b1d5-3a6f-46c0-8cae-13103f1fb58f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f829700069c17ed5a044b831836bc8592e095e6f9d2740c3a84e3cdbfe88686e"
+  },
+  "id": "JGkxBzFvqRaCuRCV2ABET",
+  "tags": [
+    {
+      "updatedAt": "2026-03-11T09:58:48.531Z",
+      "createdAt": "2026-03-11T09:58:48.531Z",
+      "id": "Gs2OOdxq5SrCJ0EZ",
+      "name": "AgenticAIEmailProject"
+    },
+    {
+      "updatedAt": "2026-03-11T09:33:26.124Z",
+      "createdAt": "2026-03-11T09:33:26.124Z",
+      "id": "LIovNkbnavgJ1TTb",
+      "name": "AgenticAIProject"
+    }
+  ]
+}

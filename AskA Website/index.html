@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Support Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        luxury: {
+                            50: '#fff7f0',
+                            100: '#ffedd5',
+                            200: '#fcd9a8',
+                            500: '#f37021',
+                            600: '#e05f10',
+                            700: '#c04f0c',
+                        }
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        pulseDot: {
+                            '0%, 80%, 100%': { transform: 'scale(0.8)', opacity: '0.5' },
+                            '40%': { transform: 'scale(1)', opacity: '1' },
+                        },
+                        slideDown: {
+                            '0%': { opacity: '0', transform: 'translateY(-8px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideInLeft: {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(0)' },
+                        }
+                    },
+                    animation: {
+                        fadeInUp: 'fadeInUp 0.22s ease-out forwards',
+                        dot1: 'pulseDot 1.4s infinite 0s',
+                        dot2: 'pulseDot 1.4s infinite 0.2s',
+                        dot3: 'pulseDot 1.4s infinite 0.4s',
+                        slideDown: 'slideDown 0.28s ease-out forwards',
+                        slideInLeft: 'slideInLeft 0.25s ease-out forwards',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="font-sans">
+
+    <!-- ─── AUTH OVERLAY ───────────────────────────────────────────────────── -->
+    <div id="auth-overlay"
+        class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+        <div class="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl animate-fadeInUp">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 rounded-full bg-[#fcd9a8] flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-7 h-7 text-[#F37021]" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900" id="auth-title">Welcome</h2>
+                <p class="text-sm text-slate-500 mt-1" id="auth-subtitle">Log in to AskA</p>
+            </div>
+
+            <div id="auth-error"
+                class="hidden mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 text-center">
+            </div>
+            <div id="auth-success"
+                class="hidden mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-600 text-center">
+            </div>
+
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label
+                        class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 pt-1">Campus ID</label>
+                    <input type="text" id="auth-username" required
+                        class="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all" />
+                </div>
+                <div>
+                    <label
+                        class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 pt-1">Password</label>
+                    <input type="password" id="auth-password" required
+                        class="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all" />
+                </div>
+                <button type="submit" id="auth-submit-btn"
+                    class="w-full mt-2 rounded-xl bg-[#F37021] px-4 py-3 text-sm font-semibold text-white shadow-md shadow-orange-200 hover:bg-[#e05f10] hover:-translate-y-px transition-all">
+                    Log In
+                </button>
+            </form>
+
+            <div class="mt-6 text-center text-sm text-slate-500">
+                <span id="auth-toggle-text">Don't have an account?</span>
+                <button type="button" id="auth-toggle-btn"
+                    class="font-semibold text-[#F37021] hover:underline ml-1">Register</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── MOBILE SIDEBAR TOGGLE ──────────────────────────────────────────── -->
+    <button id="sidebar-toggle" aria-label="Open chat history" onclick="toggleSidebar()" style="display: none;">
+        <svg width="18" height="18" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+    </button>
+
+    <!-- ─── APP SHELL ──────────────────────────────────────────────────────── -->
+    <div id="app-shell" style="display: none;">
+
+        <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════ -->
+        <aside id="chat-sidebar">
+
+            <!-- Sidebar header -->
+            <div id="sidebar-header">
+                <div class="flex items-center gap-2.5 ml-[3rem]">
+                    <div
+                        class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/30 flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-sm leading-tight">AskA Support</p>
+                    </div>
+                </div>
+
+                <!-- New Chat button -->
+                <button id="new-chat-btn" onclick="historyMgr.newChat()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    New Chat
+                </button>
+            </div>
+
+            <!-- Divider -->
+            <div class="sidebar-divider"></div>
+
+            <!-- Chat history list -->
+            <ul id="history-list" role="listbox" aria-label="Chat history"></ul>
+
+            <!-- Logout button -->
+            <div class="p-4 border-t border-[#fcd9a8] mt-auto flex-shrink-0">
+                <button id="logout-btn"
+                    class="flex w-full items-center justify-center gap-2 rounded-xl border border-[#fcd9a8] bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-[#fff7f0] hover:text-[#c04f0c] hover:border-[#F37021]/40 transition-all duration-150 cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
+                    Logout
+                </button>
+            </div>
+
+        </aside><!-- end #chat-sidebar -->
+
+        <!-- ═══ MAIN CONTENT AREA ══════════════════════════════════════════════ -->
+        <main id="main-area">
+
+            <!-- ─── TOP-RIGHT TICKET BUTTON ──────────────────────────────────── -->
+            <button id="open-form-btn" onclick="showFormView()"
+                class="fixed top-[14px] right-5 z-50 flex items-center gap-2 rounded-full bg-[#F37021] px-5 py-2 text-sm font-semibold text-white shadow-md shadow-orange-200 hover:bg-[#e05f10] hover:-translate-y-px hover:shadow-orange-300 transition-all duration-200 cursor-pointer border-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+                Submit a Form
+            </button>
+
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!--  CHAT VIEW                                                     -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="chat-view"
+                class="relative z-10 w-full max-w-5xl flex flex-col h-[88vh] max-h-[820px] rounded-3xl overflow-hidden bg-white shadow-xl shadow-slate-200/80 border border-slate-100">
+
+                <!-- Header -->
+                <div class="flex items-center gap-3.5 px-6 py-4 bg-white border-b border-slate-100">
+                    <div class="relative flex-shrink-0">
+                        <div class="w-10 h-10 rounded-full bg-[#F37021] flex items-center justify-center shadow-sm">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                            </svg>
+                        </div>
+                        <span
+                            class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white"></span>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-slate-900 text-[15px] leading-tight">AI Support Assistant</p>
+                    </div>
+                </div>
+
+                <!-- Messages area -->
+                <div id="chat-messages" class="flex-1 overflow-y-auto px-5 py-6 space-y-5 bg-slate-50/60"
+                    aria-live="polite" aria-label="Chat messages">
+                    <!-- Welcome bot bubble -->
+                    <div class="flex items-end gap-2.5 bubble-anim">
+                        <div
+                            class="w-7 h-7 rounded-full bg-[#F37021] flex-shrink-0 flex items-center justify-center shadow-sm">
+                            <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
+                            </svg>
+                        </div>
+                        <div
+                            class="max-w-[76%] rounded-2xl rounded-bl-sm px-4 py-3 bg-white border border-slate-200 text-slate-800 text-sm leading-relaxed shadow-sm">
+                            👋 Hi there! I'm your AI support assistant. How can I help you today?
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input area -->
+                <div class="px-4 py-4 bg-white border-t border-slate-100">
+                    <form id="chat-form" class="flex items-end gap-2.5">
+                        <textarea id="user-input" rows="1" placeholder="Type your message…"
+                            class="flex-1 resize-none rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150"
+                            style="max-height:120px; overflow-y:auto;"></textarea>
+                        <button id="send-btn" type="submit"
+                            class="flex-shrink-0 w-11 h-11 rounded-xl bg-[#F37021] flex items-center justify-center shadow-sm shadow-orange-200 hover:bg-[#e05f10] hover:shadow-orange-300 hover:-translate-y-px transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0">
+                            <svg class="w-5 h-5 text-white translate-x-0.5" fill="none" stroke="currentColor"
+                                stroke-width="2.2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                            </svg>
+                        </button>
+                    </form>
+                    <p class="text-center text-slate-400 text-[11px] mt-2.5">AI responses may not always be accurate.
+                        Please verify important information.</p>
+                </div>
+
+            </div><!-- end #chat-view -->
+
+
+            <!-- ═══════════════════════════════════════════════════════════════════════ -->
+            <!--  FORM VIEW  (hidden by default)                                        -->
+            <!-- ═══════════════════════════════════════════════════════════════════════ -->
+            <div id="form-view" class="hidden relative z-10 w-full max-w-5xl animate-fadeInUp self-start mt-12 mb-12">
+
+                <!-- Back button row (transparent, outside the card) -->
+                <div class="mb-4">
+                    <button onclick="showChatView()"
+                        class="inline-flex items-center gap-2 rounded-full bg-slate-50 border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900 hover:-translate-x-px transition-all duration-150 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                        </svg>
+                        Back to Chat
+                    </button>
+                </div>
+
+                <!-- Card header -->
+                <div class="bg-[#F37021] rounded-t-3xl px-8 py-6 shadow-sm">
+                    <div class="flex items-center gap-3.5">
+                        <div
+                            class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/30">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-white">Ask A Question</h1>
+                            <p class="text-sm text-orange-100 mt-0.5">We'll get back to you as soon as possible.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card body -->
+                <div
+                    class="rounded-b-3xl bg-white border border-slate-100 border-t-0 px-8 py-7 shadow-xl shadow-slate-200/70">
+
+                    <!-- SUCCESS STATE -->
+                    <div id="success-view"
+                        class="hidden flex flex-col items-center justify-center py-12 text-center space-y-5 animate-fadeInUp">
+                        <div class="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <svg class="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900">Form Submitted Successfully!</h2>
+                            <p class="text-sm text-slate-500 mt-1.5 max-w-xs mx-auto">Thank you! Our team has received
+                                your
+                                question and will get back to you soon.</p>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-3 pt-2 w-full max-w-sm">
+                            <button onclick="showChatView()"
+                                class="flex-1 flex items-center justify-center gap-2 rounded-2xl border-2 border-[#F37021] text-[#F37021] px-5 py-3 text-sm font-semibold hover:bg-orange-50 transition-all duration-150 cursor-pointer bg-white">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                                </svg>
+                                Go back to chat
+                            </button>
+                            <button id="submit-another-btn"
+                                class="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#F37021] text-white px-5 py-3 text-sm font-semibold shadow-md shadow-orange-200 hover:bg-[#e05f10] hover:shadow-orange-300 transition-all duration-150 cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                </svg>
+                                Submit another form
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error banner -->
+                    <div id="error-banner"
+                        class="hidden mb-6 flex items-center gap-3 rounded-2xl bg-red-50 border border-red-200 px-5 py-4"
+                        role="alert">
+                        <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" stroke-width="2.5"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                        </div>
+                        <p id="error-message" class="text-red-700 text-sm">Something went wrong. Please try again.</p>
+                    </div>
+
+                    <!-- THE FORM -->
+                    <form id="ticket-form" action="#" novalidate class="space-y-5">
+
+                        <!-- Row: Department + Category -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <!-- Department -->
+                            <div>
+                                <label for="department"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Department</label>
+                                <div class="relative">
+                                    <select id="department" name="department" required
+                                        class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150 cursor-pointer">
+                                        <option value="" disabled selected class="text-slate-400">Select department…
+                                        </option>
+                                        <option value="Academic Affairs - Bachelor Degree">Academic Affairs - Bachelor
+                                            Degree
+                                        </option>
+                                        <option value="Academic Affairs - Foundation">Academic Affairs - Foundation
+                                        </option>
+                                        <option value="Admission">Admission</option>
+                                        <option value="IT">IT</option>
+                                        <option value="Library">Library</option>
+                                        <option value="Operation and Maintenance Office">Operation and Maintenance
+                                            Office
+                                        </option>
+                                        <option value="Procurement and Asset Management Office">Procurement and Asset
+                                            Management
+                                            Office</option>
+                                        <option value="Student Affairs Office">Student Affairs Office</option>
+                                    </select>
+                                    <svg class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                                        fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Category -->
+                            <div>
+                                <label for="category"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Category</label>
+                                <div class="relative">
+                                    <select id="category" name="category" required
+                                        class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150 cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed">
+                                        <option value="" disabled selected class="text-slate-400">Select category…
+                                        </option>
+                                    </select>
+                                    <svg class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                                        fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row: Block & Room + Campus ID -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label for="block-room"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Block
+                                    &amp; Room No.</label>
+                                <input type="text" id="block-room" name="blockRoom" placeholder="e.g. D1 D309" required
+                                    class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150" />
+                            </div>
+                            <div>
+                                <label for="campus-id"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Campus
+                                    ID</label>
+                                <input type="text" id="campus-id" name="campusId" placeholder="e.g. DSC2409084" required
+                                    class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150" />
+                            </div>
+                        </div>
+
+                        <!-- Question -->
+                        <div>
+                            <label for="question"
+                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Question
+                                /
+                                Description</label>
+                            <textarea id="question" name="question" rows="4"
+                                placeholder="Describe your issue or question in detail…" required
+                                class="w-full rounded-xl bg-white border border-slate-200 px-4 py-3 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150 resize-y"></textarea>
+                        </div>
+
+                        <!-- Attachment -->
+                        <div>
+                            <label for="attachment"
+                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                                Attachment <span class="normal-case font-normal text-slate-400">(optional)</span>
+                            </label>
+                            <div
+                                class="rounded-xl bg-white border border-dashed border-slate-300 px-4 py-3 hover:border-[#F37021]/60 transition-colors duration-150">
+                                <input type="file" id="attachment" name="attachment"
+                                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                                    class="w-full text-sm text-slate-500 cursor-pointer" />
+                                <p class="text-xs text-slate-400 mt-1.5">Images, PDF, Word, Excel — max 10 MB</p>
+                            </div>
+                        </div>
+
+                        <!-- Row: Name + Email -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label for="name"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Name</label>
+                                <input type="text" id="name" name="name" placeholder="e.g. John Doe" required
+                                    class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150" />
+                            </div>
+                            <div>
+                                <label for="email"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Email</label>
+                                <input type="email" id="email" name="email" placeholder="e.g. john@example.com" required
+                                    class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150" />
+                            </div>
+                        </div>
+
+                        <!-- Telephone -->
+                        <div>
+                            <label for="telephone"
+                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Telephone</label>
+                            <input type="tel" id="telephone" name="telephone" placeholder="e.g. +60 12-345-6789"
+                                class="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F37021]/40 focus:border-[#F37021] transition-all duration-150" />
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="border-t border-slate-100 pt-1"></div>
+
+                        <!-- Submit button -->
+                        <button type="submit" id="submit-btn"
+                            class="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#F37021] px-6 py-3.5 font-semibold text-white text-sm shadow-md shadow-orange-200 hover:bg-[#e05f10] hover:shadow-orange-300 hover:-translate-y-px transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0">
+                            <svg id="submit-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                            </svg>
+                            <svg id="submit-spinner" class="hidden w-4 h-4 animate-spin" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                            </svg>
+                            <span id="submit-label">Submit Question</span>
+                        </button>
+
+                    </form>
+                </div><!-- end card body -->
+            </div><!-- end #form-view -->
+
+        </main><!-- end #main-area -->
+    </div><!-- end #app-shell -->
+
+
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+
+    <!-- ─── DELETE CONFIRMATION MODAL ──────────────────────────────────────── -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog"
+        aria-modal="true" aria-labelledby="delete-modal-title">
+
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="hideDeleteModal()"></div>
+
+        <!-- Card -->
+        <div
+            class="relative w-full max-w-sm rounded-2xl bg-[#fff7f0] border border-[#fcd9a8] shadow-2xl shadow-orange-100 p-6 animate-fadeInUp">
+
+            <!-- Warning icon -->
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mx-auto mb-4">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+            </div>
+
+            <!-- Title -->
+            <h2 id="delete-modal-title" class="text-center text-[15px] font-bold text-slate-900 mb-1">Delete Chat?</h2>
+
+            <!-- Body text -->
+            <p class="text-center text-sm text-slate-500 leading-relaxed mb-6">
+                Are you sure you want to delete this chat?<br>
+                <span class="font-medium text-slate-600">This action cannot be undone.</span>
+            </p>
+
+            <!-- Buttons -->
+            <div class="flex gap-3">
+                <!-- Cancel -->
+                <button onclick="hideDeleteModal()"
+                    class="flex-1 rounded-xl border border-[#fcd9a8] bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-[#fff7f0] hover:border-[#F37021]/40 transition-all duration-150 cursor-pointer">
+                    Cancel
+                </button>
+                <!-- Delete -->
+                <button onclick="confirmDelete()"
+                    class="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-200 hover:bg-red-600 hover:shadow-red-300 hover:-translate-y-px transition-all duration-150 cursor-pointer">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

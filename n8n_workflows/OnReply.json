@@ -1,0 +1,1409 @@
+{
+  "name": "OnReply",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 4,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "filters": {
+          "q": "subject:\"Re: [TICKET #\"",
+          "readStatus": "unread"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3856,
+        912
+      ],
+      "id": "63092087-3cc4-4677-8e65-503194b45f8a",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "q": "subject:\"Re: [TICKET #\"",
+          "readStatus": "unread"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -3632,
+        912
+      ],
+      "id": "fb85bc4e-d0a7-4c8c-98a1-41f85f4c3df6",
+      "name": "Get many messages",
+      "webhookId": "c2ed58c8-1406-463e-962b-d1d2c4c3c0c7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const subject = item.json.Subject || \"\";\n\n  const ticketMatch = subject.match(/\\[Ticket #(\\d+)\\]/i);\n\n  if (ticketMatch) {\n    item.json.ticketID = parseInt(ticketMatch[1], 10); \n  } else {\n    item.json.ticketID = null;\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3136,
+        912
+      ],
+      "id": "0ebea274-4d26-4ae8-b332-82ec5566fcc3",
+      "name": "Parse Ticket ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items){\n  item.json.Status = null;\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2688,
+        912
+      ],
+      "id": "fe5f3c8b-2d73-4455-bbac-6e936be3d88f",
+      "name": "Initialize Status"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2464,
+        912
+      ],
+      "id": "4eae59d0-63df-4f6a-aa07-1c9951f49a03",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT EXISTS (\n    SELECT 1 \n    FROM tickets \n    WHERE id ={{ $json.ticketID }}  AND status = 'ASSIGNED'\n) AS is_assigned;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -2256,
+        976
+      ],
+      "id": "a884e89e-455f-4dd9-a19b-6fd3461e05ee",
+      "name": "Check Assigned Ticket",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the output from the node that checked the ticket assignment\nconst assignStatus = $('Check Assigned Ticket').first().json.is_assigned;\n\n// Get the email data flowing into this Code node\nconst items = $('Loop Over Items1').all();\n\n// Evaluate and mutate\nif (assignStatus === 1) {\n  items[0].json.Status = \"LOSER\";\n}\n\n// Return the item (modified or original)\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        992
+      ],
+      "id": "db2925a2-89e9-471b-ae0b-a119990dc682",
+      "name": "Set Assigned Loser",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "qwen3:8b",
+          "mode": "list",
+          "cachedResultName": "qwen3:8b"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a strict data extraction system. Your task is to analyze a batch of email text and extract the proposed meeting start time and duration for each email.\n\nCRITICAL INSTRUCTIONS:\n\nTime Calculation: You MUST base all time calculations on the explicit Received Time (UTC) provided for each specific email. If a snippet mentions relative days (\"today\", \"tomorrow\"), calculate the exact calendar date based on that Received Time.\n\nFormat Standardization:\n\nstart_time: Must be an ISO 8601 formatted string (e.g., \"YYYY-MM-DDTHH:mm:ssZ\").\n\nduration_minutes: Must be an integer representing the total duration in minutes (e.g., \"2 hours\" = 120, \"8.00-9.00pm\" = 60).\n\nHandling Ambiguity: If either the start time or the duration is not clearly stated, vague, or missing in the snippet, return exactly null for that specific field. Do not make assumptions.\n\nOutput Constraint: You must output ONLY a valid JSON array. Do not include markdown blocks, explanations, or conversational text.\n\nEXAMPLE INPUT\n--- Email 1 ---\nID: alpha_998877\nFrom: client_a@example.com\nReceived Time (UTC): 2026-04-10T14:00:00.000Z\nSnippet: Let's do a quick sync tomorrow at 2:00 PM for 45 minutes.\n\n--- Email 2 ---\nID: beta_112233\nFrom: vendor_b@example.com\nReceived Time (UTC): 2026-04-10T15:30:00.000Z\nSnippet: I am available to meet next week, let me know what works.\n\nEXAMPLE OUTPUT\n[\n{\n\"id\": \"alpha_998877\",\n\"start_time\": \"2026-04-11T14:00:00Z\",\n\"duration_minutes\": 45\n},\n{\n\"id\": \"beta_112233\",\n\"start_time\": null,\n\"duration_minutes\": null\n}\n]\n\nACTUAL DATA TO PROCESS\n{{ $json.extracted_context }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        656
+      ],
+      "id": "7c625254-1378-4f9b-bb8c-43f3728a9e5d",
+      "name": "Message a model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "f8F4oOkrWlj1YyF6",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the raw text output. \n// CHANGE 'llm_output' to the actual field name where LLM stores its response.\nconst rawText = $input.first().json.content;\n\nif (!rawText) {\n  throw new Error(\"Critical Failure: No data received from the LLM node.\");\n}\n\n// 2. The Regex Trap: Hunt specifically for the JSON array structure.\n// This ignores markdown, introductory text, and conversational filler.\nconst jsonMatch = rawText.match(/\\[[\\s\\S]*\\]/);\n\nif (!jsonMatch) {\n  throw new Error(\"Parsing Failure: LLM did not return a recognizable JSON array. Raw output: \" + rawText);\n}\n\ntry {\n  // 3. Parse the isolated JSON string\n  const parsedData = JSON.parse(jsonMatch[0]);\n  \n  // 4. Structural Reformatting: \n  // We batched the emails earlier. Now, we split them back into individual n8n items \n  // so you can process each start_time/duration independently in your next nodes.\n  return parsedData.map(item => ({\n    json: item\n  }));\n\n} catch (error) {\n  // 5. Fail loud, fail clear.\n  throw new Error(\"JSON Parse Error: The LLM hallucinated an invalid JSON structure. \" + error.message);\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1440,
+        656
+      ],
+      "id": "eb007f26-4ac5-4e43-b259-a2ad6246d38c",
+      "name": "ParseModelOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retrieve all items from the previous node\nconst items = $input.all();\n\n// Initialize the context string\nlet contextString = \"### BATCH EMAIL CONTEXT ###\\n\\n\";\n\n// Loop through each email and extract the critical data\nitems.forEach((item, index) => {\n    const data = item.json;\n    \n    // Parse the UNIX timestamp into a readable ISO string (UTC)\n    // This is mandatory. Do not expect the LLM to do this math.\n    const timestampMs = parseInt(data.internalDate);\n    const readableDate = new Date(timestampMs).toISOString(); \n\n    // Build the clean string\n    contextString += `--- Email ${index + 1} ---\\n`;\n    contextString += `ID: ${data.id}\\n`;\n    contextString += `From: ${data.From}\\n`;\n    contextString += `Received Time (UTC): ${readableDate}\\n`;\n    contextString += `Snippet: ${data.snippet}\\n\\n`;\n});\n\n// Output a single item containing the compiled string to pass to your LLM node\nreturn [\n    {\n        json: {\n            extracted_context: contextString\n        }\n    }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        656
+      ],
+      "id": "454f8b70-f547-43fc-b512-89b4c3079091",
+      "name": "PrepareInput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2cd028c-0066-4d06-9855-fa69c6dac572",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "null",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -2240,
+        656
+      ],
+      "id": "18c7f64c-5c2f-4ada-b241-2f94c93fb878",
+      "name": "FilterNullStatus"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1216,
+        656
+      ],
+      "id": "562b6fc0-b058-45d9-a775-8fac4a9c78d9",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT duration \nFROM tickets \nWHERE id = {{ $json.ticketID }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -320,
+        672
+      ],
+      "id": "4388720d-1bb7-4418-b49b-13db30f06993",
+      "name": "GetDuration",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -544,
+        656
+      ],
+      "id": "7fad15d1-7ab2-4ef0-a26b-4aa83782cdf8",
+      "name": "CheckClash"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (let item of items) {\n  // 1. Grab the raw 'From' string (e.g., \"Jane Doe <worker2@example.com>\")\n  const rawFrom = item.json.From;\n\n  // 2. Define the logical pattern of an email address (text @ text . text)\n  const emailPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+)/;\n  \n  // 3. Search the raw string for that exact pattern\n  const match = rawFrom.match(emailPattern);\n\n  // 4. If we find a match, create the new attribute and assign the clean email.\n  // If no email is found (malformed data), we assign null to prevent pipeline crashes.\n  item.json.ExtractedEmail = match ? match[1] : null;\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2912,
+        912
+      ],
+      "id": "0e4c54dd-9b8f-456b-ab61-2b0e5337ae57",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (let item of items) {\n  // Check strictly for null. \n  if (item.json.start_time === null) {\n    // Stamp the status to flag this entry as invalid\n    item.json.Status = \"LOSER\";\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        656
+      ],
+      "id": "19c3583f-a461-432f-9c2a-33d47f9f4089",
+      "name": "RemoveNullStart"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2cd028c-0066-4d06-9855-fa69c6dac572",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "null",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -768,
+        656
+      ],
+      "id": "a9ea723f-982a-4f44-aee5-5a3af7beaa65",
+      "name": "FilterNullStatus1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS total_clashes \nFROM tickets\nWHERE worker_id = (SELECT id FROM workers WHERE email = '{{ $json.ExtractedEmail }}')\n  AND id != {{ $json.ticketID }}\n  AND start_time < ('{{ $json.start_time }}' + INTERVAL {{ $json.duration_minutes }} MINUTE)\n  AND end_time > '{{ $json.start_time }}'\n  AND status != 'RESOLVED';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        128,
+        672
+      ],
+      "id": "f5d1d693-aeda-438b-bcec-7c7af1c12e2c",
+      "name": "Get_Clash_Count",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const workerData = $('SetDuration').first().json;\n\nconst clashes = $input.first().json.total_clashes;\n\nif (clashes > 0) {\n  workerData.Status = \"LOSER\";\n} \n\nreturn [\n  {\n    json: workerData\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        704
+      ],
+      "id": "0bbef7ed-9767-48a0-a314-f5a1ef42121a",
+      "name": "SetClashtoLoser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const emails = $('CheckClash').all();   \nconst duration = $input.first().json.duration;\n\nreturn emails.map(item => {\n    if (item.json.duration_minutes === null) {\n        item.json.duration_minutes = duration;\n    }\n    return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        672
+      ],
+      "id": "7ee5043f-b7c9-4c55-9ed1-854ce45ae978",
+      "name": "SetDuration"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2cd028c-0066-4d06-9855-fa69c6dac572",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "null",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -320,
+        480
+      ],
+      "id": "f4e56c80-325d-48b0-b85d-9d8a52093d7b",
+      "name": "FilterNullStatus2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. The Memory Notepad: This will track all the time blocks we assign DURING this exact run.\nconst sessionCalendar = {};\n\n// 2. The Rosters: We need a place to line up all the applicants for each ticket.\nconst rosters = {};\n\n// ==========================================\n// PHASE 1: Build the Rosters\n// ==========================================\nfor (let item of items) {\n  // If they are already a LOSER (e.g., missing start time), ignore them completely.\n  if (item.json.Status === \"LOSER\") continue;\n\n  const tId = item.json.ticketID;\n  const email = item.json.ExtractedEmail;\n  \n  // We need absolute numbers to do math. Convert the reply date to a Number.\n  const replyTime = Number(item.json.internalDate);\n  \n  // Convert their proposed work time into absolute milliseconds for our clash math.\n  const startMs = new Date(item.json.start_time).getTime();\n  // Duration is in minutes. Multiply by 60,000 to get milliseconds.\n  const endMs = startMs + (item.json.duration_minutes * 60000);\n\n  // If this ticket doesn't have a roster yet, create a blank line.\n  if (!rosters[tId]) {\n    rosters[tId] = [];\n  }\n\n  // Put this applicant in the line for this ticket.\n  rosters[tId].push({\n    msgId: item.json.id,\n    email: email,\n    replyTime: replyTime,\n    startMs: startMs,\n    endMs: endMs,\n    originalItem: item // We keep a reference so we can easily stamp them later!\n  });\n}\n\n// ==========================================\n// PHASE 2: The Draft & Clash Check\n// ==========================================\n\n// Now we look at each ticket's roster one by one.\nfor (const tId in rosters) {\n  \n  // Sort the line of applicants from fastest reply (lowest) to slowest (highest).\n  const line = rosters[tId].sort((a, b) => a.replyTime - b.replyTime);\n\n  let ticketAwarded = false;\n\n  // Walk down the line, starting with the fastest person...\n  for (const candidate of line) {\n    const email = candidate.email;\n\n    // If this worker isn't on our memory notepad yet, add a blank page for them.\n    if (!sessionCalendar[email]) {\n      sessionCalendar[email] = [];\n    }\n\n    // Check their personal notepad to see if they are already booked.\n    let hasClash = false;\n    for (const bookedTime of sessionCalendar[email]) {\n      // The Golden Rule of Time Overlap: (Start A < End B) AND (End A > Start B)\n      if (candidate.startMs < bookedTime.endMs && candidate.endMs > bookedTime.startMs) {\n        hasClash = true;\n        break; // Stop checking, they are booked!\n      }\n    }\n\n    // Did they pass the test?\n    if (!hasClash && !ticketAwarded) {\n      // We found our winner! Stamp their original item.\n      candidate.originalItem.json.Status = \"WINNER\";\n      \n      // CRITICAL: Write this new job down on their notepad so they don't get double-booked on the next ticket.\n      sessionCalendar[email].push({\n        startMs: candidate.startMs,\n        endMs: candidate.endMs\n      });\n      \n      ticketAwarded = true; // The ticket is gone, move to the next ticket ID.\n    } else {\n      // If they clashed, or if someone faster already took the ticket, they get the loser stamp.\n      candidate.originalItem.json.Status = \"LOSER\";\n    }\n  }\n}\n\n// ==========================================\n// PHASE 3: The Cleanup\n// ==========================================\n// Just to be absolutely certain, anyone who didn't get a WINNER stamp is officially a LOSER.\nfor (let item of items) {\n  if (item.json.Status !== \"WINNER\") {\n    item.json.Status = \"LOSER\";\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        480
+      ],
+      "id": "38b280fa-81a0-49fd-84f2-14f758ed6eee",
+      "name": "findWinner"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a953682c-1e5f-492e-a24b-eaa2c2fcf5c6",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "=WINNER",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        128,
+        480
+      ],
+      "id": "2b076382-6123-4fcd-b3c6-22a864b851f8",
+      "name": "OnlyWinner"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "your-calendar@example.com",
+          "mode": "list",
+          "cachedResultName": "your-calendar@example.com"
+        },
+        "start": "={{ DateTime.fromISO($('Loop Over Winners').item.json.start_time.slice(0, 19), { zone: 'Asia/Kuala_Lumpur' }).toISO() }}",
+        "end": "={{ DateTime.fromISO($('Loop Over Winners').item.json.start_time.slice(0, 19), { zone: 'Asia/Kuala_Lumpur' }).plus({ minutes: $('Loop Over Winners').item.json.duration_minutes }).toISO() }}",
+        "additionalFields": {
+          "summary": "=[W-{{ $('Loop Over Winners').item.json.ExtractedEmail }}] Ticket #{{ $('Loop Over Winners').item.json.ticketID}}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        800,
+        480
+      ],
+      "id": "2c8fe785-e536-4638-9869-f342055c81ec",
+      "name": "Create an event1",
+      "notesInFlow": false,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "U4NmT5OC5TkAI7fG",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        352,
+        480
+      ],
+      "id": "cff85dcc-d309-407d-9818-b6d3fe070cf1",
+      "name": "Loop Over Winners"
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -3136,
+        1120
+      ],
+      "id": "83c81ee7-81a3-4f6d-a48d-b0e8d5617b23",
+      "name": "Mark a message as read",
+      "webhookId": "17990715-2540-462f-9e07-0dcb2ec7e7fd",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT student_email \nFROM tickets\nWHERE id = {{ $('Loop Over Winners').item.json.ticketID }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1216,
+        480
+      ],
+      "id": "006cf2b1-f932-4005-b4ef-2dedb0605e2c",
+      "name": "GetStudentEmail",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tickets \nSET \n    status = 'ASSIGNED',\n    worker_id = (SELECT id FROM workers WHERE email = '{{ $json.ExtractedEmail }}'),\n    start_time = '{{ $json.start_time.slice(0, 19).replace(\"T\", \" \") }}',\n    duration = {{ $json.duration_minutes }}\nWHERE \n    id = {{ $json.ticketID }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        576,
+        496
+      ],
+      "id": "394b8dd7-6134-43b8-a3e0-2ceb1955c7fb",
+      "name": "AssignWorker",
+      "credentials": {
+        "mySql": {
+          "id": "vLekUqYySOtuH2PG",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        -3424,
+        912
+      ],
+      "id": "c997e89e-293e-4c68-b539-54e007113581",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.student_email }}",
+        "subject": "=Your [Ticket#{{ $('Loop Over Winners').item.json.ticketID }}] Has Been Assigned To a Worker.",
+        "message": "=<div style=\"font-family: Arial, sans-serif; padding: 15px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #f9f9f9;\">\n  <p style=\"margin: 0; color: #333; font-size: 16px;\">\n    The fixing time will be from&nbsp;\n    <strong style=\"color: #0056b3;\">\n      {{ DateTime.fromISO($('Loop Over Winners').item.json.start_time.slice(0, 19), { zone: 'Asia/Kuala_Lumpur' }).toFormat('MMMM d, yyyy, h:mm a') }}\n    </strong> \n    &nbsp;until&nbsp;\n    <strong style=\"color: #0056b3;\">\n      {{ DateTime.fromISO($('Loop Over Winners').item.json.start_time.slice(0, 19), { zone: 'Asia/Kuala_Lumpur' }).plus({ minutes: $('Loop Over Winners').item.json.duration_minutes }).toFormat('h:mm a') }}\n    </strong>.\n  </p>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1424,
+        480
+      ],
+      "id": "1e307ac6-a8a5-4102-83c4-4efc5607089d",
+      "name": "SendtoStudent",
+      "webhookId": "4488741b-c2e7-441a-b451-4682de5e3903",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Loop Over Winners').item.json.id }}",
+        "message": "=Congratulations! [Ticket#{{ $('Loop Over Winners').item.json.ticketID }}] is now yours. Please check the department calendar.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        480
+      ],
+      "id": "ef57beb9-90a6-4dc3-ad10-0dd76f54c88c",
+      "name": "Reply to Winner",
+      "webhookId": "28c00cb3-8b84-45a2-8964-3ad2a16ddb00",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $json.id }}",
+        "message": "=Hi, thanks for your response. However, this ticket #{{ $json.ticketID }} has been officially assigned to another technician and its schedule has been locked in the system.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        224
+      ],
+      "id": "4ffd4ca5-5bab-4fe8-b262-3699ea60cfe0",
+      "name": "Reply to Loser",
+      "webhookId": "28c00cb3-8b84-45a2-8964-3ad2a16ddb00",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2cd028c-0066-4d06-9855-fa69c6dac572",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "LOSER",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -768,
+        448
+      ],
+      "id": "ebc07169-e608-4f2c-81ba-fc036ba44123",
+      "name": "Unclear start time loser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b14bae14-3ce3-4816-8404-3c9eee03ee98",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "LOSER",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -320,
+        272
+      ],
+      "id": "0342edcd-a4a3-4590-8b73-429f68436f8b",
+      "name": "Schedule clash loser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a953682c-1e5f-492e-a24b-eaa2c2fcf5c6",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "=LOSER",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        128,
+        288
+      ],
+      "id": "cb6286e3-6929-49b3-81f5-63b4a30bf96c",
+      "name": "Assigned to other worker loser"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        688,
+        208
+      ],
+      "id": "19dc9770-a6fe-457e-8647-74b0ac91e2a2",
+      "name": "ReplyLoserLoop"
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $json.id }}",
+        "message": "=Hi, thanks for your response. However, we cannot proceed with this request due to a schedule clash.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        16
+      ],
+      "id": "07115888-ae41-43ed-910a-68fa75310bab",
+      "name": "Reply to Loser1",
+      "webhookId": "28c00cb3-8b84-45a2-8964-3ad2a16ddb00",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b1023379-f237-41dc-bf0b-5eb00ad712a8",
+      "name": "ReplyLoserLoop1"
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $json.id }}",
+        "message": "=We are unable to process this request because the applied start time is unclear.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -352,
+        48
+      ],
+      "id": "1b3f576c-efe8-4c34-9253-ea7787fc289c",
+      "name": "Reply to Loser2",
+      "webhookId": "28c00cb3-8b84-45a2-8964-3ad2a16ddb00",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sTjWbVERrYvTofG7",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -592,
+        32
+      ],
+      "id": "a0889a86-b2a2-4f18-8d00-e7df3626d7a7",
+      "name": "ReplyLoserLoop2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2cd028c-0066-4d06-9855-fa69c6dac572",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "LOSER",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -1808,
+        368
+      ],
+      "id": "6296baf1-f4c6-4bd6-8b37-bbc74e5bb4b0",
+      "name": "Assigned job loser"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        336,
+        208
+      ],
+      "id": "15d3da36-ff0e-4b0d-b5af-464b10232eed",
+      "name": "Merge1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many messages": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Ticket ID": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Status": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "FilterNullStatus",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Assigned job loser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Assigned Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Assigned Ticket": {
+      "main": [
+        [
+          {
+            "node": "Set Assigned Loser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Assigned Loser": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "ParseModelOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseModelOutput": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "PrepareInput": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterNullStatus": {
+      "main": [
+        [
+          {
+            "node": "PrepareInput",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "RemoveNullStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckClash": {
+      "main": [
+        [
+          {
+            "node": "FilterNullStatus2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Schedule clash loser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetDuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetDuration": {
+      "main": [
+        [
+          {
+            "node": "SetDuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Initialize Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RemoveNullStart": {
+      "main": [
+        [
+          {
+            "node": "FilterNullStatus1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Unclear start time loser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterNullStatus1": {
+      "main": [
+        [
+          {
+            "node": "CheckClash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get_Clash_Count": {
+      "main": [
+        [
+          {
+            "node": "SetClashtoLoser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SetClashtoLoser": {
+      "main": [
+        [
+          {
+            "node": "CheckClash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SetDuration": {
+      "main": [
+        [
+          {
+            "node": "Get_Clash_Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterNullStatus2": {
+      "main": [
+        [
+          {
+            "node": "findWinner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "findWinner": {
+      "main": [
+        [
+          {
+            "node": "OnlyWinner",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Assigned to other worker loser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnlyWinner": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Winners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event1": {
+      "main": [
+        [
+          {
+            "node": "Reply to Winner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Winners": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AssignWorker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetStudentEmail": {
+      "main": [
+        [
+          {
+            "node": "SendtoStudent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AssignWorker": {
+      "main": [
+        [
+          {
+            "node": "Create an event1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Parse Ticket ID",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendtoStudent": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Winners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Winner": {
+      "main": [
+        [
+          {
+            "node": "GetStudentEmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unclear start time loser": {
+      "main": [
+        [
+          {
+            "node": "ReplyLoserLoop2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule clash loser": {
+      "main": [
+        [
+          {
+            "node": "ReplyLoserLoop1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assigned to other worker loser": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Reply to Loser": {
+      "main": [
+        [
+          {
+            "node": "ReplyLoserLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReplyLoserLoop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Reply to Loser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Loser1": {
+      "main": [
+        [
+          {
+            "node": "ReplyLoserLoop1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReplyLoserLoop1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Reply to Loser1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Loser2": {
+      "main": [
+        [
+          {
+            "node": "ReplyLoserLoop2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReplyLoserLoop2": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Reply to Loser2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assigned job loser": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "ReplyLoserLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "26519f75-1e8f-4b46-b9a6-4cba1cad3bca",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f829700069c17ed5a044b831836bc8592e095e6f9d2740c3a84e3cdbfe88686e"
+  },
+  "id": "ANsl41IjYWP88rQa5AvtS",
+  "tags": [
+    {
+      "updatedAt": "2026-03-11T09:58:48.531Z",
+      "createdAt": "2026-03-11T09:58:48.531Z",
+      "id": "Gs2OOdxq5SrCJ0EZ",
+      "name": "AgenticAIEmailProject"
+    },
+    {
+      "updatedAt": "2026-03-11T09:33:26.124Z",
+      "createdAt": "2026-03-11T09:33:26.124Z",
+      "id": "LIovNkbnavgJ1TTb",
+      "name": "AgenticAIProject"
+    }
+  ]
+}

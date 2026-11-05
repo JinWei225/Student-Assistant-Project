@@ -1,0 +1,348 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    background-color: #f8f7f4;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, #e8e0d8 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: 0.45;
+}
+
+/* ── App shell ── */
+#app-shell {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+}
+
+#main-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow-y: auto;
+    min-width: 0;
+}
+
+/* ── Sidebar ── */
+#chat-sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff7f0;
+    border-right: 1px solid #fcd9a8;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
+}
+
+/* Desktop collapsed state */
+@media (min-width: 1024px) {
+    #chat-sidebar.collapsed {
+        width: 0;
+        border-right-width: 0;
+
+        * {
+            opacity: 0;
+            pointer-events: none;
+        }
+    }
+}
+
+/* Mobile: hide sidebar off-screen by default */
+@media (max-width: 1023px) {
+    #chat-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        transform: translateX(-100%);
+    }
+
+    #chat-sidebar.sidebar-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 20px rgba(243, 112, 33, 0.15);
+    }
+}
+
+/* Sidebar header */
+#sidebar-header {
+    background: linear-gradient(135deg, #F37021 0%, #e05f10 100%);
+    padding: 1.25rem 1rem;
+    flex-shrink: 0;
+}
+
+/* New chat button */
+#new-chat-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    background: white;
+    color: #F37021;
+    border: none;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 0.85rem;
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    letter-spacing: 0.01em;
+}
+
+#new-chat-btn:hover {
+    background: #fff7f0;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.13);
+}
+
+#new-chat-btn:active {
+    transform: translateY(0);
+}
+
+/* Divider */
+.sidebar-divider {
+    height: 1px;
+    background: #fcd9a8;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+/* History list */
+#history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+    list-style: none;
+    margin: 0;
+}
+
+#history-list::-webkit-scrollbar {
+    width: 3px;
+}
+
+#history-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#history-list::-webkit-scrollbar-thumb {
+    background: #fcd9a8;
+    border-radius: 10px;
+}
+
+/* Session item */
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    border-radius: 0 8px 8px 0;
+    margin: 2px 6px 2px 0;
+}
+
+.history-item:hover {
+    background: #fdf3ea;
+}
+
+.history-item.active {
+    background: #ffedd5;
+    border-left-color: #F37021;
+}
+
+.history-item-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    background: #fcd9a8;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #c04f0c;
+    transition: background 0.15s;
+}
+
+.history-item.active .history-item-icon {
+    background: #F37021;
+    color: white;
+}
+
+.history-item-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-item-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-item.active .history-item-title {
+    color: #c04f0c;
+}
+
+.history-item-time {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.history-item.active .history-item-time {
+    color: #e05f10;
+}
+
+/* Delete button on history item */
+.history-item-delete {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #c4a882;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    padding: 0;
+}
+
+.history-item:hover .history-item-delete {
+    opacity: 1;
+}
+
+.history-item-delete:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Empty state */
+#history-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #c4a882;
+}
+
+#history-empty svg {
+    opacity: 0.4;
+    margin-bottom: 0.5rem;
+}
+
+#history-empty p {
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+/* Mobile hamburger override removed, display by default */
+#sidebar-toggle {
+    display: flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 210;
+    width: 38px;
+    height: 38px;
+    background: #F37021;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(243, 112, 33, 0.35);
+    transition: background 0.15s;
+}
+
+#sidebar-toggle:hover {
+    background: #e05f10;
+}
+
+/* Chat scrollbar */
+#chat-messages::-webkit-scrollbar {
+    width: 4px;
+}
+
+#chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chat-messages::-webkit-scrollbar-thumb {
+    background: #ddd0c4;
+    border-radius: 10px;
+}
+
+/* Form scrollbar */
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ddd0c4;
+    border-radius: 10px;
+}
+
+.bubble-anim {
+    animation: fadeInUp 0.22s ease-out;
+}
+
+/* File input button */
+input[type="file"]::file-selector-button {
+    background: #F37021;
+    border: none;
+    color: white;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 12px;
+    transition: background 0.15s;
+}
+
+input[type="file"]::file-selector-button:hover {
+    background: #e05f10;
+}
+
+/* Select reset */
+select {
+    -webkit-appearance: none;
+    appearance: none;
+}
